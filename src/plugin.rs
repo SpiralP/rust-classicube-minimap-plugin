@@ -1,7 +1,14 @@
+#![allow(non_snake_case)]
+
 use crate::helpers::Texture_RenderShaded;
 use classicube_helpers::{detour::static_detour, tick::TickEventHandler, CellGetSet};
 use classicube_sys::*;
-use std::cell::{Cell, RefCell};
+use rand::Rng;
+use std::{
+    cell::{Cell, RefCell},
+    os::raw::*,
+    slice,
+};
 
 const WHITE_TRANSPARENT: PackedCol = PackedCol_Make(255, 255, 255, 0);
 const TEXTURE_WIDTH: usize = 1024;
@@ -17,37 +24,36 @@ thread_local!(
             Width: TEXTURE_WIDTH as i32,
             Height: TEXTURE_HEIGHT as i32,
         };
-
         RefCell::new(OwnedGfxTexture::create(&mut bmp, true, false))
     };
 );
 
-// fn update_texture() {
-//     let part = Bitmap {
-//         Scan0: new_pixels as *mut _,
-//         Width: TEXTURE_WIDTH as i32,
-//         Height: TEXTURE_HEIGHT as i32,
-//     };
+fn update_texture(bmp: &mut Bitmap) {
+    TEXTURE.with(|cell| {
+        let owned_texture = &mut *cell.borrow_mut();
 
-//     Gfx_UpdateTexturePart(self.texture.resource_id, 0, 0, &mut part, 0);
-// }
+        unsafe {
+            Gfx_UpdateTexturePart(owned_texture.resource_id, 0, 0, bmp, 0);
+        }
+    });
+}
 
-extern "C" fn draw() {
+fn draw() {
     TEXTURE.with(|cell| {
         let owned_texture = &*cell.borrow();
 
         unsafe {
             let mut texture = Texture {
                 ID: owned_texture.resource_id,
-                X: 400,
-                Y: 50,
-                Width: 300 as _,
+                X: 640,
+                Y: 20,
+                Width: 200 as _,
                 Height: 200 as _,
                 uv: TextureRec {
                     U1: 0.0,
                     V1: 0.0,
-                    U2: 1.0,
-                    V2: 1.0,
+                    U2: 128f32 / 1024f32,
+                    V2: 128f32 / 1024f32,
                 },
             };
 
@@ -57,7 +63,7 @@ extern "C" fn draw() {
 }
 
 thread_local!(
-    static FIRST_IN_TICK: Cell<bool> = Cell::new(false);
+    static FIRST_IN_RENDER: Cell<bool> = Cell::new(false);
 );
 
 thread_local!(
@@ -73,9 +79,10 @@ fn load_matrix(type_: MatrixType, matrix: *mut Matrix) {
 
         if type_ == MatrixType__MATRIX_VIEW {
             if let Some(iso_transform) = ISO_TRANSFORM.get() {
-                if matrix == iso_transform && FIRST_IN_TICK.get() {
-                    FIRST_IN_TICK.set(false);
-                    log::warn!("GOTEM");
+                if matrix == iso_transform && FIRST_IN_RENDER.get() {
+                    FIRST_IN_RENDER.set(false);
+
+                    doot();
                     draw();
                 }
             }
@@ -129,9 +136,18 @@ fn matrix_rotatex(result: *mut Matrix, angle: f32) {
     }
 }
 
-thread_local!(
-    static TICK: RefCell<TickEventHandler> = RefCell::new(TickEventHandler::new());
-);
+static_detour! {
+    static LOCAL_PLAYER_RENDER_MODEL_DETOUR: unsafe extern "C" fn(*mut Entity, c_double, c_float);
+}
+
+/// This is called when LocalPlayer_RenderModel is called.
+fn render_model(local_player_entity: *mut Entity, delta: c_double, t: c_float) {
+    unsafe {
+        LOCAL_PLAYER_RENDER_MODEL_DETOUR.call(local_player_entity, delta, t);
+    }
+
+    FIRST_IN_RENDER.set(true);
+}
 
 pub fn initialize() {
     unsafe {
@@ -149,14 +165,122 @@ pub fn initialize() {
             .initialize(Matrix_RotateX, matrix_rotatex)
             .unwrap();
         MATRIX_ROTATEX_DETOUR.enable().unwrap();
+
+        let me = &*Entities.List[ENTITIES_SELF_ID as usize];
+        let v_table = &*me.VTABLE;
+        let target = v_table.RenderModel.unwrap();
+
+        LOCAL_PLAYER_RENDER_MODEL_DETOUR
+            .initialize(target, render_model)
+            .unwrap();
+        LOCAL_PLAYER_RENDER_MODEL_DETOUR.enable().unwrap();
+    }
+}
+
+fn doot() {
+    let width = 128;
+    let height = 128;
+
+    let mut pixels: Vec<u8> = vec![255; 4 * width * height];
+
+    unsafe {
+        let me = &*Entities.List[ENTITIES_SELF_ID as usize];
+        // me.Position
+
+        let atlas_pixels = slice::from_raw_parts_mut(
+            Atlas2D.Bmp.Scan0,
+            (4 * Atlas2D.Bmp.Width * Atlas2D.Bmp.Height) as usize,
+        );
+
+        for x in 0..width {
+            for z in 0..height {
+                for y in (0..64).rev() {
+                    let block_id = World_GetBlock(x as i32, y as i32, z as i32) as usize;
+
+                    if block_id == 0 {
+                        continue;
+                    }
+
+                    let tex_index = block_id * FACE_COUNT;
+                    let tex_loc = Blocks.Textures[tex_index + FACE_YMAX] as usize;
+
+                    let atlas_x = Atlas2D_TileX(tex_loc);
+                    let atlas_y = Atlas2D_TileY(tex_loc);
+                    let atlas_id = atlas_x + atlas_y * ATLAS2D_TILES_PER_ROW;
+                    // log::debug!("{}", atlas_id);
+                    let first_pixel_index = atlas_id as usize * Atlas2D.TileSize as usize;
+                    // let random_pixel =
+                    //     first_pixel_index + rng.gen_range(0, Atlas2D.TileSize as usize);
+                    // log::debug!("{}", first_pixel_index);
+                    let first_color_of_tile =
+                        &atlas_pixels[first_pixel_index * 4..(first_pixel_index * 4 + 4)];
+
+                    let pixels_index = x + z * width;
+                    let p = &mut pixels[pixels_index * 4..pixels_index * 4 + 4];
+
+                    p[0] = first_color_of_tile[0]
+                        .checked_sub(y)
+                        .unwrap_or(first_color_of_tile[0]); // blue
+                    p[1] = first_color_of_tile[1]
+                        .checked_sub(y)
+                        .unwrap_or(first_color_of_tile[1]); // green
+                    p[2] = first_color_of_tile[2]
+                        .checked_sub(y)
+                        .unwrap_or(first_color_of_tile[2]); // red
+                    p[3] = 255; // alpha
+
+                    break;
+                }
+            }
+        }
+
+        let x = me.Position.X as usize;
+        let z = me.Position.Z as usize;
+
+        let pixels_index = x + z * width;
+        let p = &mut pixels[pixels_index * 4..pixels_index * 4 + 4];
+
+        p[0] = 255;
+        p[1] = 255;
+        p[2] = 255;
+        p[3] = 255;
     }
 
-    TICK.with(|cell| {
-        let tick = &mut *cell.borrow_mut();
+    let mut bmp = Bitmap {
+        Scan0: pixels.as_mut_ptr(),
+        Width: width as i32,
+        Height: height as i32,
+    };
 
-        tick.on(|_| {
-            log::debug!("tick");
-            FIRST_IN_TICK.set(true);
-        });
-    });
+    update_texture(&mut bmp);
 }
+// for (i = 0; i < Array_Elems(Blocks.Textures); i++) {
+//     maxLoc = max(maxLoc, Blocks.Textures[i]);
+// }
+// return Atlas1D_Index(maxLoc) + 1;
+
+const FACE_XMIN: usize = 0; // Face X = 0
+const FACE_XMAX: usize = 1; // Face X = 1
+const FACE_ZMIN: usize = 2; // Face Z = 0
+const FACE_ZMAX: usize = 3; // Face Z = 1
+const FACE_YMIN: usize = 4; // Face Y = 0
+const FACE_YMAX: usize = 5; // Face Y = 1
+const FACE_COUNT: usize = 6; // Number of faces on a cube
+
+const ATLAS2D_TILES_PER_ROW: usize = 16;
+const ATLAS2D_MASK: usize = 15;
+const ATLAS2D_SHIFT: usize = 4;
+
+fn Atlas2D_TileX(tex_loc: usize) -> usize {
+    tex_loc & ATLAS2D_MASK
+}
+fn Atlas2D_TileY(tex_loc: usize) -> usize {
+    tex_loc >> ATLAS2D_SHIFT
+}
+
+// #define Atlas2D_TileX(texLoc) ((texLoc) &  ATLAS2D_MASK)  /* texLoc % ATLAS2D_TILES_PER_ROW */
+// #define Atlas2D_TileY(texLoc) ((texLoc) >> ATLAS2D_SHIFT) /* texLoc / ATLAS2D_TILES_PER_ROW */
+// /* Returns the index of the given tile id within a 1D atlas */
+// #define Atlas1D_RowId(texLoc) ((texLoc)  & Atlas1D.Mask)  /* texLoc % Atlas1D_TilesPerAtlas */
+// /* Returns the index of the 1D atlas within the array of 1D atlases that contains the given tile id */
+// #define Atlas1D_Index(texLoc) ((texLoc) >> Atlas1D.Shift) /* texLoc / Atlas1D_TilesPerAtlas */
