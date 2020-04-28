@@ -1,9 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::helpers::Texture_RenderShaded;
-use classicube_helpers::{detour::static_detour, tick::TickEventHandler, CellGetSet};
+use classicube_helpers::{detour::static_detour, CellGetSet};
 use classicube_sys::*;
-use rand::Rng;
 use std::{
     cell::{Cell, RefCell},
     os::raw::*,
@@ -43,6 +42,11 @@ fn draw() {
         let owned_texture = &*cell.borrow();
 
         unsafe {
+            let me = &*Entities.List[ENTITIES_SELF_ID as usize];
+            let p = me.Position;
+            let u = (p.X.max(0.0).min(127.0) / 128f32).max(0.0).min(1.0);
+            let v = (p.Z.max(0.0).min(127.0) / 128f32).max(0.0).min(1.0);
+
             let mut texture = Texture {
                 ID: owned_texture.resource_id,
                 X: 640,
@@ -50,10 +54,10 @@ fn draw() {
                 Width: 200 as _,
                 Height: 200 as _,
                 uv: TextureRec {
-                    U1: 0.0,
-                    V1: 0.0,
-                    U2: 128f32 / 1024f32,
-                    V2: 128f32 / 1024f32,
+                    U1: ((68f32 * u) / 1024f32),
+                    V1: ((68f32 * v) / 1024f32),
+                    U2: ((68f32 * (1.0 + u)) / 1024f32),
+                    V2: ((68f32 * (1.0 + v)) / 1024f32),
                 },
             };
 
@@ -218,15 +222,9 @@ fn doot() {
                     let pixels_index = x + z * width;
                     let p = &mut pixels[pixels_index * 4..pixels_index * 4 + 4];
 
-                    p[0] = first_color_of_tile[0]
-                        .checked_sub(y)
-                        .unwrap_or(first_color_of_tile[0]); // blue
-                    p[1] = first_color_of_tile[1]
-                        .checked_sub(y)
-                        .unwrap_or(first_color_of_tile[1]); // green
-                    p[2] = first_color_of_tile[2]
-                        .checked_sub(y)
-                        .unwrap_or(first_color_of_tile[2]); // red
+                    p[0] = first_color_of_tile[0];
+                    p[1] = first_color_of_tile[1];
+                    p[2] = first_color_of_tile[2];
                     p[3] = 255; // alpha
 
                     break;
@@ -234,8 +232,8 @@ fn doot() {
             }
         }
 
-        let x = me.Position.X as usize;
-        let z = me.Position.Z as usize;
+        let x = me.Position.X.max(0.0).min(127.0) as usize;
+        let z = me.Position.Z.max(0.0).min(127.0) as usize;
 
         let pixels_index = x + z * width;
         let p = &mut pixels[pixels_index * 4..pixels_index * 4 + 4];
