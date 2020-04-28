@@ -1,5 +1,5 @@
 [package]
-name = "rust-classicube-minimap-plugin"
+name = "classicube-minimap-plugin"
 version = "0.1.0"
 authors = ["SpiralP <spiral.palmer@gmail.com>"]
 edition = "2018"
