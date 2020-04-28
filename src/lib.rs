@@ -1,8 +1,21 @@
+mod context_handler;
+mod error;
+mod helpers;
+mod logger;
+mod plugin;
+
 use classicube_sys::*;
 use std::{os::raw::c_int, ptr};
 
 extern "C" fn init() {
-    //
+    color_backtrace::install_with_settings(
+        color_backtrace::Settings::new().verbosity(color_backtrace::Verbosity::Full),
+    );
+
+    logger::initialize(true, false);
+
+    context_handler::initialize();
+    plugin::initialize();
 }
 
 extern "C" fn free() {
@@ -10,7 +23,7 @@ extern "C" fn free() {
 }
 
 extern "C" fn on_new_map_loaded() {
-    //
+    log::debug!("on_new_map_loaded");
 }
 
 #[no_mangle]

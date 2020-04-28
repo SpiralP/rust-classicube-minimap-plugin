@@ -10,3 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 classicube-helpers = { git = "https://github.com/SpiralP/rust-classicube-helpers.git" }
 classicube-sys = { git = "https://github.com/SpiralP/rust-classicube-sys.git" }
+color-backtrace = { git = "https://github.com/SpiralP/color-backtrace-msgbox.git" }
+error-chain = "0.12.2"
+log = "0.4.8"
+simplelog = "0.7.6"
