@@ -1,5 +1,5 @@
 use simplelog::*;
-use std::{fs::File, sync::Once};
+use std::sync::Once;
 
 pub fn initialize(debug: bool, other_crates: bool) {
     static START: Once = Once::new();
@@ -14,13 +14,6 @@ pub fn initialize(debug: bool, other_crates: bool) {
         let my_crate_name = env!("CARGO_PKG_NAME").replace("-", "_");
 
         let mut loggers: Vec<Box<dyn SharedLogger>> = Vec::with_capacity(2);
-        // loggers.push(WriteLogger::new(
-        //     level,
-        //     ConfigBuilder::new()
-        //         .add_filter_allow(my_crate_name.clone())
-        //         .build(),
-        //     File::create("cef.log").unwrap(),
-        // ));
 
         let mut config = ConfigBuilder::new();
 
@@ -31,9 +24,7 @@ pub fn initialize(debug: bool, other_crates: bool) {
             config.add_filter_allow(my_crate_name);
         }
 
-        if let Some(term_logger) = TermLogger::new(level, config.build(), TerminalMode::Mixed) {
-            loggers.push(term_logger);
-        }
+        loggers.push(TermLogger::new(level, config.build(), TerminalMode::Mixed));
 
         CombinedLogger::init(loggers).unwrap();
     });

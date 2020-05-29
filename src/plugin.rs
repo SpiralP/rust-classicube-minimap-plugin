@@ -3,6 +3,7 @@
 use crate::helpers::Texture_RenderShaded;
 use classicube_helpers::{detour::static_detour, CellGetSet};
 use classicube_sys::*;
+use log::*;
 use std::{
     cell::{Cell, RefCell},
     os::raw::*,
@@ -79,7 +80,7 @@ static_detour!(
 );
 fn load_matrix(type_: MatrixType, matrix: *mut Matrix) {
     unsafe {
-        // log::debug!("load_matrix {:?} {:?}", type_, matrix);
+        // debug!("load_matrix {:?} {:?}", type_, matrix);
 
         if type_ == MatrixType__MATRIX_VIEW {
             if let Some(iso_transform) = ISO_TRANSFORM.get() {
@@ -109,7 +110,7 @@ fn matrix_mul(result: *mut Matrix, left: *const Matrix, right: *const Matrix) {
             ISO_TRANSFORM.set(Some(result));
             ABOUT_TO_CALL_MUL.set(false);
 
-            log::info!("FOUND ISO_TRANSFORM");
+            info!("FOUND ISO_TRANSFORM");
 
             MATRIX_MUL_DETOUR.disable().unwrap();
             Matrix_Mul(result, left, right);
@@ -211,11 +212,11 @@ fn doot() {
                     let atlas_x = Atlas2D_TileX(tex_loc);
                     let atlas_y = Atlas2D_TileY(tex_loc);
                     let atlas_id = atlas_x + atlas_y * ATLAS2D_TILES_PER_ROW;
-                    // log::debug!("{}", atlas_id);
+                    // debug!("{}", atlas_id);
                     let first_pixel_index = atlas_id as usize * Atlas2D.TileSize as usize;
                     // let random_pixel =
                     //     first_pixel_index + rng.gen_range(0, Atlas2D.TileSize as usize);
-                    // log::debug!("{}", first_pixel_index);
+                    // debug!("{}", first_pixel_index);
                     let first_color_of_tile =
                         &atlas_pixels[first_pixel_index * 4..(first_pixel_index * 4 + 4)];
 

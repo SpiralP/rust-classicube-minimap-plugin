@@ -5,6 +5,7 @@ mod logger;
 mod plugin;
 
 use classicube_sys::*;
+use log::*;
 use std::{os::raw::c_int, ptr};
 
 extern "C" fn init() {
@@ -19,11 +20,11 @@ extern "C" fn init() {
 }
 
 extern "C" fn free() {
-    //
+    context_handler::shutdown();
 }
 
 extern "C" fn on_new_map_loaded() {
-    log::debug!("on_new_map_loaded");
+    debug!("on_new_map_loaded");
 }
 
 #[no_mangle]
