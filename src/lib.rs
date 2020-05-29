@@ -25,6 +25,7 @@ extern "C" fn free() {
 
 extern "C" fn on_new_map_loaded() {
     debug!("on_new_map_loaded");
+    plugin::on_new_map_loaded();
 }
 
 #[no_mangle]
