@@ -9,7 +9,13 @@ const TEXTURE_WIDTH: usize = 1024;
 const TEXTURE_HEIGHT: usize = 1024;
 
 thread_local!(
-    static TEXTURE: RefCell<OwnedGfxTexture> = {
+    static TEXTURE: RefCell<Option<OwnedGfxTexture>> = Default::default();
+);
+
+pub fn init() {
+    TEXTURE.with(|cell| {
+        let opt = &mut *cell.borrow_mut();
+
         // must be a vec or else we try to fit huge array onto stack and crash!
         let mut pixels: Vec<u8> = vec![255; 4 * TEXTURE_WIDTH * TEXTURE_HEIGHT];
 
@@ -18,13 +24,23 @@ thread_local!(
             Width: TEXTURE_WIDTH as i32,
             Height: TEXTURE_HEIGHT as i32,
         };
-        RefCell::new(OwnedGfxTexture::create(&mut bmp, true, false))
-    };
-);
+
+        *opt = Some(OwnedGfxTexture::create(&mut bmp, true, false));
+    });
+}
+
+pub fn free() {
+    TEXTURE.with(|cell| {
+        let opt = &mut *cell.borrow_mut();
+
+        drop(opt.take());
+    });
+}
 
 fn update_texture(bmp: &mut Bitmap) {
     TEXTURE.with(|cell| {
-        let owned_texture = &mut *cell.borrow_mut();
+        let opt = &mut *cell.borrow_mut();
+        let owned_texture = opt.as_mut().unwrap();
 
         unsafe {
             Gfx_UpdateTexturePart(owned_texture.resource_id, 0, 0, bmp, 0);
@@ -34,7 +50,8 @@ fn update_texture(bmp: &mut Bitmap) {
 
 pub fn draw() {
     TEXTURE.with(|cell| {
-        let owned_texture = &*cell.borrow();
+        let opt = &*cell.borrow();
+        let owned_texture = opt.as_ref().unwrap();
 
         unsafe {
             let me = &*Entities.List[ENTITIES_SELF_ID as usize];

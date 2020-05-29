@@ -16,10 +16,11 @@ extern "C" fn init() {
     logger::initialize(true, false);
 
     context_handler::initialize();
-    plugin::initialize();
+    plugin::init();
 }
 
 extern "C" fn free() {
+    plugin::free();
     context_handler::shutdown();
 }
 

@@ -2,6 +2,7 @@
 #![allow(unused_variables)]
 
 use classicube_sys::{Gui_Add, Gui_Remove, Screen as CCScreen, ScreenVTABLE};
+use log::*;
 use std::{
     mem,
     os::raw::{c_char, c_int, c_void},
@@ -50,6 +51,8 @@ impl Screen {
     }
 
     pub fn remove(&mut self) {
+        debug!("Screen::remove()");
+
         unsafe {
             Gui_Remove(self.screen.as_mut().get_unchecked_mut());
         }
