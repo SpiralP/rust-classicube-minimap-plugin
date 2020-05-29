@@ -1,14 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::helpers::Texture_RenderShaded;
-use classicube_helpers::{detour::static_detour, CellGetSet};
 use classicube_sys::*;
-use log::*;
-use std::{
-    cell::{Cell, RefCell},
-    os::raw::*,
-    slice,
-};
+use std::{cell::RefCell, slice};
 
 const WHITE_TRANSPARENT: PackedCol = PackedCol_Make(255, 255, 255, 0);
 const TEXTURE_WIDTH: usize = 1024;
@@ -38,7 +32,7 @@ fn update_texture(bmp: &mut Bitmap) {
     });
 }
 
-fn draw() {
+pub fn draw() {
     TEXTURE.with(|cell| {
         let owned_texture = &*cell.borrow();
 
@@ -67,122 +61,7 @@ fn draw() {
     });
 }
 
-thread_local!(
-    static FIRST_IN_RENDER: Cell<bool> = Cell::new(false);
-);
-
-thread_local!(
-    static ISO_TRANSFORM: Cell<Option<*mut Matrix>> = Default::default();
-);
-
-static_detour!(
-    static LOAD_MATRIX_DETOUR: unsafe extern "C" fn(MatrixType, *mut Matrix);
-);
-fn load_matrix(type_: MatrixType, matrix: *mut Matrix) {
-    unsafe {
-        // debug!("load_matrix {:?} {:?}", type_, matrix);
-
-        if type_ == MatrixType__MATRIX_VIEW {
-            if let Some(iso_transform) = ISO_TRANSFORM.get() {
-                if matrix == iso_transform && FIRST_IN_RENDER.get() {
-                    FIRST_IN_RENDER.set(false);
-
-                    doot();
-                    draw();
-                }
-            }
-        }
-
-        LOAD_MATRIX_DETOUR.call(type_, matrix);
-    }
-}
-
-thread_local!(
-    static ABOUT_TO_CALL_MUL: Cell<bool> = Cell::new(false);
-);
-
-static_detour!(
-    static MATRIX_MUL_DETOUR: unsafe extern "C" fn(*mut Matrix, *const Matrix, *const Matrix);
-);
-fn matrix_mul(result: *mut Matrix, left: *const Matrix, right: *const Matrix) {
-    unsafe {
-        if ABOUT_TO_CALL_MUL.get() {
-            ISO_TRANSFORM.set(Some(result));
-            ABOUT_TO_CALL_MUL.set(false);
-
-            info!("FOUND ISO_TRANSFORM");
-
-            MATRIX_MUL_DETOUR.disable().unwrap();
-            Matrix_Mul(result, left, right);
-        } else {
-            MATRIX_MUL_DETOUR.call(result, left, right);
-            MATRIX_MUL_DETOUR.disable().unwrap();
-            Matrix_Mul(result, left, right);
-            MATRIX_MUL_DETOUR.enable().unwrap();
-        }
-    }
-}
-
-static_detour!(
-    static MATRIX_ROTATEX_DETOUR: unsafe extern "C" fn(*mut Matrix, f32);
-);
-fn matrix_rotatex(result: *mut Matrix, angle: f32) {
-    unsafe {
-        if (angle - -30f32 * MATH_DEG2RAD as f32).abs() < 0.00001 {
-            ABOUT_TO_CALL_MUL.set(true);
-
-            MATRIX_ROTATEX_DETOUR.disable().unwrap();
-            Matrix_RotateX(result, angle);
-        } else {
-            MATRIX_ROTATEX_DETOUR.disable().unwrap();
-            Matrix_RotateX(result, angle);
-            MATRIX_ROTATEX_DETOUR.enable().unwrap();
-        }
-    }
-}
-
-static_detour! {
-    static LOCAL_PLAYER_RENDER_MODEL_DETOUR: unsafe extern "C" fn(*mut Entity, c_double, c_float);
-}
-
-/// This is called when LocalPlayer_RenderModel is called.
-fn render_model(local_player_entity: *mut Entity, delta: c_double, t: c_float) {
-    unsafe {
-        LOCAL_PLAYER_RENDER_MODEL_DETOUR.call(local_player_entity, delta, t);
-    }
-
-    FIRST_IN_RENDER.set(true);
-}
-
-pub fn initialize() {
-    unsafe {
-        LOAD_MATRIX_DETOUR
-            .initialize(Gfx_LoadMatrix, load_matrix)
-            .unwrap();
-        LOAD_MATRIX_DETOUR.enable().unwrap();
-
-        MATRIX_MUL_DETOUR
-            .initialize(Matrix_Mul, matrix_mul)
-            .unwrap();
-        MATRIX_MUL_DETOUR.enable().unwrap();
-
-        MATRIX_ROTATEX_DETOUR
-            .initialize(Matrix_RotateX, matrix_rotatex)
-            .unwrap();
-        MATRIX_ROTATEX_DETOUR.enable().unwrap();
-
-        let me = &*Entities.List[ENTITIES_SELF_ID as usize];
-        let v_table = &*me.VTABLE;
-        let target = v_table.RenderModel.unwrap();
-
-        LOCAL_PLAYER_RENDER_MODEL_DETOUR
-            .initialize(target, render_model)
-            .unwrap();
-        LOCAL_PLAYER_RENDER_MODEL_DETOUR.enable().unwrap();
-    }
-}
-
-fn doot() {
+pub fn update() {
     let width = 128;
     let height = 128;
 
@@ -253,16 +132,12 @@ fn doot() {
 
     update_texture(&mut bmp);
 }
-// for (i = 0; i < Array_Elems(Blocks.Textures); i++) {
-//     maxLoc = max(maxLoc, Blocks.Textures[i]);
-// }
-// return Atlas1D_Index(maxLoc) + 1;
 
-const FACE_XMIN: usize = 0; // Face X = 0
-const FACE_XMAX: usize = 1; // Face X = 1
-const FACE_ZMIN: usize = 2; // Face Z = 0
-const FACE_ZMAX: usize = 3; // Face Z = 1
-const FACE_YMIN: usize = 4; // Face Y = 0
+// const FACE_XMIN: usize = 0; // Face X = 0
+// const FACE_XMAX: usize = 1; // Face X = 1
+// const FACE_ZMIN: usize = 2; // Face Z = 0
+// const FACE_ZMAX: usize = 3; // Face Z = 1
+// const FACE_YMIN: usize = 4; // Face Y = 0
 const FACE_YMAX: usize = 5; // Face Y = 1
 const FACE_COUNT: usize = 6; // Number of faces on a cube
 
@@ -276,10 +151,3 @@ fn Atlas2D_TileX(tex_loc: usize) -> usize {
 fn Atlas2D_TileY(tex_loc: usize) -> usize {
     tex_loc >> ATLAS2D_SHIFT
 }
-
-// #define Atlas2D_TileX(texLoc) ((texLoc) &  ATLAS2D_MASK)  /* texLoc % ATLAS2D_TILES_PER_ROW */
-// #define Atlas2D_TileY(texLoc) ((texLoc) >> ATLAS2D_SHIFT) /* texLoc / ATLAS2D_TILES_PER_ROW */
-// /* Returns the index of the given tile id within a 1D atlas */
-// #define Atlas1D_RowId(texLoc) ((texLoc)  & Atlas1D.Mask)  /* texLoc % Atlas1D_TilesPerAtlas */
-// /* Returns the index of the 1D atlas within the array of 1D atlases that contains the given tile id */
-// #define Atlas1D_Index(texLoc) ((texLoc) >> Atlas1D.Shift) /* texLoc / Atlas1D_TilesPerAtlas */
