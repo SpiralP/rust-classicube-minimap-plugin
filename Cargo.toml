@@ -17,4 +17,4 @@ simplelog = "0.8.0"
 
 
 [patch."https://github.com/SpiralP/rust-classicube-sys.git"]
-classicube-sys = { git = "https://github.com/SpiralP//rust-classicube-sys.git", branch = "next" }
+classicube-sys = { git = "https://github.com/SpiralP/rust-classicube-sys//", branch = "next" }

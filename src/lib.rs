@@ -1,3 +1,5 @@
+#![warn(unused_extern_crates)]
+
 mod context_handler;
 mod error;
 mod helpers;
