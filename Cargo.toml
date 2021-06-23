@@ -11,10 +11,11 @@ crate-type = ["cdylib"]
 classicube-helpers = { git = "https://github.com/SpiralP/rust-classicube-helpers.git" }
 classicube-sys = { git = "https://github.com/SpiralP/rust-classicube-sys.git" }
 color-backtrace = { git = "https://github.com/SpiralP/color-backtrace-msgbox.git" }
-error-chain = "0.12.2"
-log = "0.4.8"
-simplelog = "0.8.0"
+error-chain = "0.12"
+log = "0.4"
+simplelog = "0.10"
 
 
+# remove when ClassiCube 1.2.6
 [patch."https://github.com/SpiralP/rust-classicube-sys.git"]
-classicube-sys = { git = "https://github.com/SpiralP/rust-classicube-sys//", branch = "next" }
+classicube-sys = { git = "https://github.com/SpiralP//rust-classicube-sys.git", branch = "next" }

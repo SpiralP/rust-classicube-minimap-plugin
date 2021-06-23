@@ -17,12 +17,12 @@ pub fn init() {
         let opt = &mut *cell.borrow_mut();
 
         // must be a vec or else we try to fit huge array onto stack and crash!
-        let mut pixels: Vec<u8> = vec![255; 4 * TEXTURE_WIDTH * TEXTURE_HEIGHT];
+        let mut pixels: Vec<u32> = vec![255; TEXTURE_WIDTH * TEXTURE_HEIGHT];
 
         let mut bmp = Bitmap {
-            Scan0: pixels.as_mut_ptr(),
-            Width: TEXTURE_WIDTH as i32,
-            Height: TEXTURE_HEIGHT as i32,
+            scan0: pixels.as_mut_ptr(),
+            width: TEXTURE_WIDTH as i32,
+            height: TEXTURE_HEIGHT as i32,
         };
 
         *opt = Some(OwnedGfxTexture::create(&mut bmp, true, false));
@@ -82,15 +82,15 @@ pub fn update() {
     let width = 128;
     let height = 128;
 
-    let mut pixels: Vec<u8> = vec![255; 4 * width * height];
+    let mut pixels: Vec<u32> = vec![255; width * height];
 
     unsafe {
         let me = &*Entities.List[ENTITIES_SELF_ID as usize];
         // me.Position
 
         let atlas_pixels = slice::from_raw_parts_mut(
-            Atlas2D.Bmp.Scan0,
-            (4 * Atlas2D.Bmp.Width * Atlas2D.Bmp.Height) as usize,
+            Atlas2D.Bmp.scan0,
+            (Atlas2D.Bmp.width * Atlas2D.Bmp.height) as usize,
         );
 
         for x in 0..width {
@@ -113,16 +113,8 @@ pub fn update() {
                     // let random_pixel =
                     //     first_pixel_index + rng.gen_range(0, Atlas2D.TileSize as usize);
                     // debug!("{}", first_pixel_index);
-                    let first_color_of_tile =
-                        &atlas_pixels[first_pixel_index * 4..(first_pixel_index * 4 + 4)];
-
-                    let pixels_index = x + z * width;
-                    let p = &mut pixels[pixels_index * 4..pixels_index * 4 + 4];
-
-                    p[0] = first_color_of_tile[0];
-                    p[1] = first_color_of_tile[1];
-                    p[2] = first_color_of_tile[2];
-                    p[3] = 255; // alpha
+                    let first_color_of_tile = atlas_pixels[first_pixel_index];
+                    pixels[x + z * width] = first_color_of_tile;
 
                     break;
                 }
@@ -132,19 +124,13 @@ pub fn update() {
         let x = me.Position.X.max(0.0).min(127.0) as usize;
         let z = me.Position.Z.max(0.0).min(127.0) as usize;
 
-        let pixels_index = x + z * width;
-        let p = &mut pixels[pixels_index * 4..pixels_index * 4 + 4];
-
-        p[0] = 255;
-        p[1] = 255;
-        p[2] = 255;
-        p[3] = 255;
+        pixels[x + z * width] = 0xFFFFFFFF;
     }
 
     let mut bmp = Bitmap {
-        Scan0: pixels.as_mut_ptr(),
-        Width: width as i32,
-        Height: height as i32,
+        scan0: pixels.as_mut_ptr(),
+        width: width as i32,
+        height: height as i32,
     };
 
     update_texture(&mut bmp);

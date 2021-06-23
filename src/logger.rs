@@ -24,7 +24,12 @@ pub fn initialize(debug: bool, other_crates: bool) {
             config.add_filter_allow(my_crate_name);
         }
 
-        loggers.push(TermLogger::new(level, config.build(), TerminalMode::Mixed));
+        loggers.push(TermLogger::new(
+            level,
+            config.build(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ));
 
         CombinedLogger::init(loggers).unwrap();
     });
