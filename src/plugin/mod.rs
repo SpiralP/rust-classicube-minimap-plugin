@@ -1,8 +1,8 @@
 mod bmp;
 
 use classicube_sys::{screen, screen::Screen};
-use log::*;
 use std::{cell::RefCell, os::raw::c_void};
+use tracing::debug;
 
 thread_local!(
     static SCREEN: RefCell<Option<Screen>> = Default::default();

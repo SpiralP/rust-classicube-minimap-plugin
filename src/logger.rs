@@ -1,36 +1,29 @@
-use simplelog::*;
 use std::sync::Once;
+use tracing_subscriber::{filter::EnvFilter, prelude::*};
 
 pub fn initialize(debug: bool, other_crates: bool) {
-    static START: Once = Once::new();
-
-    START.call_once(move || {
-        let level = if debug {
-            LevelFilter::Debug
-        } else {
-            LevelFilter::Info
-        };
-
+    static ONCE: Once = Once::new();
+    ONCE.call_once(move || {
+        let level = if debug { "debug" } else { "info" };
         let my_crate_name = env!("CARGO_PKG_NAME").replace("-", "_");
 
-        let mut loggers: Vec<Box<dyn SharedLogger>> = Vec::with_capacity(2);
+        let mut filter = EnvFilter::from_default_env();
 
-        let mut config = ConfigBuilder::new();
-
-        config.set_target_level(LevelFilter::Trace);
-        config.set_thread_level(LevelFilter::Trace);
-
-        if !other_crates {
-            config.add_filter_allow(my_crate_name);
+        if other_crates {
+            filter = filter.add_directive(level.parse().unwrap());
+        } else {
+            filter = filter.add_directive(format!("{}={}", my_crate_name, level).parse().unwrap());
         }
 
-        loggers.push(TermLogger::new(
-            level,
-            config.build(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ));
+        let subscriber = tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_target(false)
+            .with_thread_ids(false)
+            .with_thread_names(false)
+            .with_ansi(true)
+            .without_time()
+            .finish();
 
-        CombinedLogger::init(loggers).unwrap();
+        subscriber.init();
     });
 }
