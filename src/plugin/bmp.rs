@@ -25,7 +25,7 @@ pub fn init() {
             height: TEXTURE_HEIGHT as i32,
         };
 
-        *opt = Some(OwnedGfxTexture::create(&mut bmp, true, false));
+        *opt = Some(OwnedGfxTexture::new(&mut bmp, true, false));
     });
 }
 

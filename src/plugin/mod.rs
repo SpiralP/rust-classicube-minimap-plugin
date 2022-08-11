@@ -1,11 +1,12 @@
 mod bmp;
 
-use classicube_sys::{screen, screen::Screen};
 use std::{cell::RefCell, os::raw::c_void};
+
+use classicube_sys::screen::{OwnedScreen, Priority};
 use tracing::debug;
 
 thread_local!(
-    static SCREEN: RefCell<Option<Screen>> = Default::default();
+    static SCREEN: RefCell<Option<OwnedScreen>> = Default::default();
 );
 
 pub fn init() {
@@ -14,10 +15,8 @@ pub fn init() {
     SCREEN.with(|cell| {
         let opt = &mut *cell.borrow_mut();
 
-        let screen = Screen::new(screen::Callbacks {
-            render: Some(render),
-            ..Default::default()
-        });
+        let mut screen = OwnedScreen::new();
+        screen.on_render(render);
         *opt = Some(screen);
     });
 }
@@ -38,7 +37,7 @@ pub fn on_new_map_loaded() {
         let opt = &mut *cell.borrow_mut();
         let screen = opt.as_mut().unwrap();
 
-        screen.add(screen::Priority::UnderEverything);
+        screen.add(Priority::UnderEverything);
     });
 }
 
