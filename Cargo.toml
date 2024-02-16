@@ -14,4 +14,4 @@ classicube-sys = { git = "https://github.com/SpiralP/rust-classicube-sys.git" }
 color-backtrace = { git = "https://github.com/SpiralP/color-backtrace-msgbox.git" }
 error-chain = "0.12"
 tracing = "0.1"
-tracing-subscriber = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
